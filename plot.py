@@ -114,10 +114,11 @@ def svg_text(x, y, text, size=14, fill="#273244", weight="normal", anchor="start
 
 
 def make_svg(results):
-    width, height = 1120, 780
+    width, height = 1120, 830
     x0, x1 = 100, 1060
-    top_y0, top_y1 = 175, 425
-    bot_y0, bot_y1 = 520, 690
+    top_y0, top_y1 = 130, 400
+    bot_y0, bot_y1 = 500, 675
+    years = [row["year"] for row in results]
     max_median = max(max(r["college"], r["high_school_or_less"]) for r in results)
     max_ratio = max(r["ratio"] for r in results)
     for row in results:
@@ -126,72 +127,66 @@ def make_svg(results):
         max_ratio = max(max_ratio, row.get("ratio_ci_upper", 0))
     med_max = max(600_000, math.ceil(max_median / 100_000) * 100_000)
     ratio_max = max(8, math.ceil(max_ratio / 2) * 2)
-    years = [row["year"] for row in results]
     x_for = lambda year: x0 + (year - years[0]) / (years[-1] - years[0]) * (x1 - x0)
     y_money = lambda value: top_y1 - value / med_max * (top_y1 - top_y0)
     y_ratio = lambda value: bot_y1 - value / ratio_max * (bot_y1 - bot_y0)
-    college_color, hs_color, ratio_color = "#176B87", "#D38332", "#6847A5"
+    black, gray = "#111111", "#555555"
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
              '<rect width="100%" height="100%" fill="#FFFFFF"/>',
-             svg_text(60, 52, "Family net worth by reference-person education", 26, "#172335", "bold"),
-             svg_text(60, 82, "Median net worth and college-to-high-school wealth ratio, 1989–2025", 16, "#526174"),
-             svg_text(60, 120, "Median net worth · thousands of 2025 dollars", 15, "#273244", "bold")]
+             svg_text(60, 40, "Median family net worth · thousands of 2025 dollars", 16, black, "bold")]
+    for x, label, color, dash, marker in ((112, "Bachelor’s degree or higher", black, "", "circle"),
+                                          (435, "High school or less", gray, "8 5", "square")):
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        parts.append(f'<line x1="{x}" y1="76" x2="{x+28}" y2="76" stroke="{color}" stroke-width="2.8"{dash_attr}/>')
+        if marker == "circle":
+            parts.append(f'<circle cx="{x+14}" cy="76" r="3.5" fill="white" stroke="{color}" stroke-width="2"/>')
+        else:
+            parts.append(f'<rect x="{x+10.5}" y="72.5" width="7" height="7" fill="white" stroke="{color}" stroke-width="2"/>')
+        parts.append(svg_text(x+36, 81, label, 13, "#222222"))
     for tick in range(0, 601, 100):
         y = y_money(tick * 1000)
-        parts += [f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" stroke="#E2E8EF"/>',
-                  svg_text(x0 - 14, y + 5, f"${tick:,}k", 12, "#64748B", anchor="end")]
+        parts += [f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" stroke="#D8D8D8"/>',
+                  svg_text(x0-14, y+5, f"${tick:,}k", 12, "#333333", anchor="end")]
     for year in years:
-        x = x_for(year)
-        parts += [f'<line x1="{x:.1f}" y1="{top_y0}" x2="{x:.1f}" y2="{top_y1}" stroke="#F0F3F6"/>',
-                  svg_text(x, top_y1 + 23, year, 11, "#64748B", anchor="middle")]
-    for key, color in (("college", college_color), ("high_school_or_less", hs_color)):
-        ci_low, ci_high = f"{key}_ci_lower", f"{key}_ci_upper"
-        if all(ci_low in row and ci_high in row for row in results):
+        x=x_for(year)
+        parts += [f'<line x1="{x:.1f}" y1="{top_y0}" x2="{x:.1f}" y2="{top_y1}" stroke="#EEEEEE"/>',
+                  svg_text(x, top_y1+22, year, 11, "#333333", anchor="middle")]
+    for key, color, dash, marker in (("college", black, "", "circle"),
+                                     ("high_school_or_less", gray, "8 5", "square")):
+        low_key, high_key = f"{key}_ci_lower", f"{key}_ci_upper"
+        if all(low_key in r and high_key in r for r in results):
             for row in results:
-                x = x_for(row["year"])
-                low_y = y_money(max(0, row[ci_low]))
-                high_y = y_money(max(0, row[ci_high]))
-                parts += [f'<line x1="{x:.1f}" y1="{low_y:.1f}" x2="{x:.1f}" y2="{high_y:.1f}" stroke="{color}" stroke-width="1.2" opacity="0.68"/>',
-                          f'<line x1="{x-3:.1f}" y1="{low_y:.1f}" x2="{x+3:.1f}" y2="{low_y:.1f}" stroke="{color}" stroke-width="1.2" opacity="0.68"/>',
-                          f'<line x1="{x-3:.1f}" y1="{high_y:.1f}" x2="{x+3:.1f}" y2="{high_y:.1f}" stroke="{color}" stroke-width="1.2" opacity="0.68"/>']
-        coords = " ".join(f'{x_for(r["year"]):.1f},{y_money(r[key]):.1f}' for r in results)
-        parts.append(f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>')
+                x=x_for(row["year"]); lo=y_money(max(0,row[low_key])); hi=y_money(max(0,row[high_key]))
+                parts.append(f'<line x1="{x:.1f}" y1="{lo:.1f}" x2="{x:.1f}" y2="{hi:.1f}" stroke="{color}" stroke-width="1"/>')
+        coords=" ".join(f'{x_for(r["year"]):.1f},{y_money(r[key]):.1f}' for r in results)
+        dash_attr=f' stroke-dasharray="{dash}"' if dash else ""
+        parts.append(f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="2.8"{dash_attr}/>')
         for row in results:
-            parts.append(f'<circle cx="{x_for(row["year"]):.1f}" cy="{y_money(row[key]):.1f}" r="4.2" fill="{color}"/>')
-    for x, color, label in ((x0 + 12, college_color, "Bachelor’s degree or higher"),
-                            (x0 + 268, hs_color, "High school or less")):
-        parts += [f'<line x1="{x}" y1="147" x2="{x+28}" y2="147" stroke="{color}" stroke-width="4"/>',
-                  svg_text(x + 36, 152, label, 13, "#344256")]
-
-    latest = results[-1]
-    lx = x_for(latest["year"])
-    college_label = f"${latest['college'] / 1000:,.0f}k"
-    hs_label = f"${latest['high_school_or_less'] / 1000:,.0f}k"
-    parts += [svg_text(lx - 8, y_money(latest["college"]) - 12,
-                       college_label, 12, college_color, "bold", "end"),
-              svg_text(lx - 8, y_money(latest["high_school_or_less"]) + 19,
-                       hs_label, 12, hs_color, "bold", "end"),
-              svg_text(60, 490, "Median wealth ratio · college group ÷ high-school-or-less group", 15, "#273244", "bold")]
-    for tick in range(0, ratio_max + 1, 2):
-        y = y_ratio(tick)
-        parts += [f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" stroke="#E2E8EF"/>',
-                  svg_text(x0 - 14, y + 5, f"{tick}×", 12, "#64748B", anchor="end")]
-    ratio_coords = " ".join(f'{x_for(r["year"]):.1f},{y_ratio(r["ratio"]):.1f}' for r in results)
-    if all("ratio_ci_lower" in row and "ratio_ci_upper" in row for row in results):
-        for row in results:
-            x = x_for(row["year"])
-            low_y = y_ratio(max(0, row["ratio_ci_lower"]))
-            high_y = y_ratio(max(0, row["ratio_ci_upper"]))
-            parts += [f'<line x1="{x:.1f}" y1="{low_y:.1f}" x2="{x:.1f}" y2="{high_y:.1f}" stroke="{ratio_color}" stroke-width="1.2" opacity="0.68"/>',
-                      f'<line x1="{x-3:.1f}" y1="{low_y:.1f}" x2="{x+3:.1f}" y2="{low_y:.1f}" stroke="{ratio_color}" stroke-width="1.2" opacity="0.68"/>',
-                      f'<line x1="{x-3:.1f}" y1="{high_y:.1f}" x2="{x+3:.1f}" y2="{high_y:.1f}" stroke="{ratio_color}" stroke-width="1.2" opacity="0.68"/>']
-    parts.append(f'<polyline points="{ratio_coords}" fill="none" stroke="{ratio_color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>')
+            x=x_for(row["year"]); y=y_money(row[key])
+            if marker == "circle":
+                parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="white" stroke="{color}" stroke-width="2"/>')
+            else:
+                parts.append(f'<rect x="{x-3.5:.1f}" y="{y-3.5:.1f}" width="7" height="7" fill="white" stroke="{color}" stroke-width="2"/>')
+    latest=results[-1]; lx=x_for(latest["year"])
+    parts += [svg_text(lx-8,y_money(latest["college"])-12,f'${latest["college"]/1000:,.0f}k',12,black,"bold","end"),
+              svg_text(lx-8,y_money(latest["high_school_or_less"])+19,f'${latest["high_school_or_less"]/1000:,.0f}k',12,gray,"bold","end"),
+              svg_text(60,463,"Median wealth ratio · college group ÷ high-school-or-less group",15,black,"bold")]
+    for tick in range(0,ratio_max+1,2):
+        y=y_ratio(tick)
+        parts += [f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" stroke="#D8D8D8"/>',
+                  svg_text(x0-14,y+5,f"{tick}×",12,"#333333",anchor="end")]
+    coords=" ".join(f'{x_for(r["year"]):.1f},{y_ratio(r["ratio"]):.1f}' for r in results)
+    parts.append(f'<polyline points="{coords}" fill="none" stroke="{black}" stroke-width="2.8"/>')
     for row in results:
-        parts.append(f'<circle cx="{x_for(row["year"]):.1f}" cy="{y_ratio(row["ratio"]):.1f}" r="4.2" fill="{ratio_color}"/>')
-        parts.append(svg_text(x_for(row["year"]), bot_y1 + 23, row["year"], 11, "#64748B", anchor="middle"))
-    parts += [svg_text(lx - 8, y_ratio(latest["ratio"]) - 12, f'{latest["ratio"]:.1f}×', 13, ratio_color, "bold", "end"),
-              svg_text(60, 754, "Source: Federal Reserve SCF public summary extracts. Bars show 95% intervals combining replicate-weight sampling and imputation variance.", 11, "#657286"),
-              svg_text(60, 771, "Education is of the reference person; some college/associate degree group excluded. Weighted medians average five implicates; 2025 dollars.", 11, "#657286"),
+        x=x_for(row["year"]); y=y_ratio(row["ratio"])
+        parts += [f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="white" stroke="{black}" stroke-width="2"/>',
+                  svg_text(x,bot_y1+22,row["year"],11,"#333333",anchor="middle")]
+    parts += [svg_text(lx-8,y_ratio(latest["ratio"])-12,f'{latest["ratio"]:.1f}×',13,black,"bold","end"),
+              '<line x1="60" y1="720" x2="1060" y2="720" stroke="#111111" stroke-width="1"/>',
+              svg_text(60,748,"Figure 1. Median family net worth by reference-person education and college-to-high-school-or-less ratio, 1989–2025.",13,black,"bold"),
+              svg_text(60,776,"Source: Federal Reserve Board, Survey of Consumer Finances (SCF), public summary extracts, 1989–2025.",12,"#222222"),
+              svg_text(60,800,"Note: All families; weighted medians averaged across five implicates. Whiskers show 95% intervals. Education is of the reference person; some college excluded.",11,"#333333"),
+              svg_text(60,818,"Dollars in 2025 dollars.",11,"#333333"),
               '</svg>']
     return "\n".join(parts)
 
