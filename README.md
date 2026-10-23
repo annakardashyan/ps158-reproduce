@@ -11,7 +11,7 @@ The data are the Federal Reserve Board's [Survey of Consumer Finances (SCF) publ
 - **Families:** All SCF families, not only families with children.
 - **Education:** The extract identifies education for the family's reference person, not both parents. `EDCL = 4` is bachelor's degree or more; `EDCL = 1` or `2` is high-school education or less. `EDCL = 3` (some college or an associate degree) is excluded.
 - **Weights and implicates:** Within each of the five SCF implicates, `plot.py` calculates medians using the survey weight `WGT`, then averages the five medians. The ratio is calculated for each implicate and then averaged.
-- **Uncertainty:** `estimate_uncertainty.py` uses the Fed's replicate weights for sampling variability and the five implicates for imputation variability. The plotted whiskers are approximate 95% intervals, computed as estimate ± 1.96 standard errors.
+- **Uncertainty:** `estimate_uncertainty.py` uses the Fed's replicate weights for sampling variability and the five implicates for imputation variability. The upper-panel median whiskers are approximate 95% intervals, computed as estimate ± 1.96 standard errors. The script also calculates an interval for the ratio, but the lower panel does not display it.
 
 ## Check against the Fed's published numbers
 
@@ -19,7 +19,7 @@ As a validation, the 2025 public extract's median net worth for families whose r
 
 The 2025 estimated median is **$511,660** (approximate 95% interval: **$446,870–$576,450**) for college-degree families and **$80,878** (**$67,169–$94,587**) for high-school-or-less families. The median difference is **$430,782** (**$364,654–$496,910**).
 
-One historical point needs caution: the public extract gives a 2007 college-group median of about **$509,676 in 2025 dollars**, while the original 2007 SCF Bulletin table reports **$280,800 in 2007 dollars**. Those figures do not reconcile through a simple inflation adjustment. The discrepancy may reflect revisions, disclosure adjustments, or weighting differences; its cause has not been established.
+One historical comparison needs context: the current public extract gives a 2007 college-group median of about **$509,676 in 2025 dollars** (the five implicate medians average to this value). The original 2007 SCF Bulletin reports **$280,800 in 2007 dollars** in a table based on internal SCF data. The Fed distinguishes its internal-data tables from its public-data tables, and says its current historical chart uses public data and 2025 dollars. That makes the two values different data vintages/versions as well as different dollar years; the current public estimate is consistent with the public-data series, but the exact contribution of disclosure adjustments and later revisions to the gap from the old internal estimate cannot be isolated here.
 
 As a second comparison, the Census Bureau's [SIPP household wealth report](https://www2.census.gov/library/publications/2026/demo/p70br-218.pdf) also finds higher median wealth at higher education levels. Its amounts are not directly comparable: SIPP measures households and education of the household's most educated member, and uses a different wealth definition.
 
