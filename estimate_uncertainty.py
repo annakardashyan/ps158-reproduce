@@ -44,6 +44,12 @@ def read_extract(year):
             raise ValueError(f"Expected one CSV in {path.name}; found {names}")
         frame = pd.read_csv(archive.open(names[0]))
     frame.columns = [str(column).lower() for column in frame.columns]
+    required = {"kids", "edcl", "wgt", "networth"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"{path.name} is missing required fields: {sorted(missing)}")
+    if frame["kids"].isna().any():
+        raise ValueError(f"{path.name} has missing KIDS values")
     if "x1" in frame:
         id_col = "x1"
         frame["implicate"] = frame[id_col].astype("int64") % 10
@@ -51,8 +57,9 @@ def read_extract(year):
         id_col = "y1"
         frame["implicate"] = (frame["y1"].astype("int64")
                               - 10 * frame["yy1"].astype("int64"))
+    has_children = pd.to_numeric(frame["kids"], errors="coerce").gt(0)
     frame["education_group"] = np.select(
-        [frame["edcl"].eq(4), frame["edcl"].isin([1, 2])],
+        [has_children & frame["edcl"].eq(4), has_children & frame["edcl"].isin([1, 2])],
         ["college", "high_school_or_less"], default="excluded")
     return frame, id_col
 
@@ -84,6 +91,8 @@ def sample_variance_from_replicates(first_implicate, rep_frame, id_col):
 
     result = {}
     for group in ("college", "high_school_or_less"):
+        # education_group was assigned only after KIDS > 0 in read_extract;
+        # this therefore applies the identical target population to all 999 replicates.
         subset = joined.loc[joined["education_group"] == group].copy()
         if subset.empty:
             raise ValueError(f"No records for {group}")
@@ -136,7 +145,7 @@ def estimate_year(year):
     }
     estimates = {**points, "gap": points["college"] - points["high_school_or_less"],
                  "ratio": mean(ratio_by_imp)}
-    output = {"year": year}
+    output = {"year": year, "population_filter": "KIDS > 0"}
     for key, estimate in estimates.items():
         se = (sample_vars[key] + (6 / 5) * imp_vars[key]) ** 0.5
         output[f"{key}_se"] = se

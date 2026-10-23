@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
-import io
+import csv
 
 
 BASE = "https://www.federalreserve.gov"
@@ -82,7 +82,19 @@ def download_and_extract(year):
                      if name.lower().endswith(".csv")]
         if len(csv_names) != 1:
             raise RuntimeError(f"Expected one CSV in {zip_path.name}; found {csv_names}")
-        csv_path.write_bytes(archive.read(csv_names[0]))
+        payload = archive.read(csv_names[0])
+        # KIDS is required to define the workshop population (families with
+        # children). Check the downloaded schema before saving it as usable data.
+        import io
+        reader = csv.reader(io.StringIO(payload.decode("utf-8-sig")))
+        fields = {field.strip().upper() for field in next(reader, [])}
+        required = {"KIDS", "EDCL", "WGT", "NETWORTH"}
+        if not required.issubset(fields):
+            raise RuntimeError(
+                f"{zip_path.name} is missing required columns: "
+                f"{sorted(required - fields)}"
+            )
+        csv_path.write_bytes(payload)
     print(f"Extracted {csv_path.name}")
 
 

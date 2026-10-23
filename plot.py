@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot SCF family net worth by reference-person education.
+"""Plot median net worth for SCF families with children by reference-person education.
 
 Reads the Federal Reserve's public summary-extract CSV ZIPs from data/raw,
 averages five implicate-specific weighted medians, and writes a result CSV and
@@ -70,7 +70,7 @@ def read_year(year):
             text = io.TextIOWrapper(source, encoding="utf-8-sig", newline="")
             reader = csv.DictReader(text)
             fields = {field.upper() for field in (reader.fieldnames or [])}
-            required = {"WGT", "EDCL", "NETWORTH"}
+            required = {"WGT", "EDCL", "NETWORTH", "KIDS"}
             if not required.issubset(fields):
                 raise ValueError(f"{path.name} is missing required columns: {required - fields}")
             if not ("X1" in fields or {"Y1", "YY1"}.issubset(fields)):
@@ -79,9 +79,12 @@ def read_year(year):
                 row = {key.upper(): value for key, value in raw_row.items() if key}
                 imp = implicate(row, fields)
                 group = number(row, "EDCL")
+                kids = number(row, "KIDS")
                 wealth = number(row, "NETWORTH")
                 weight = number(row, "WGT")
-                if imp is None or group is None or wealth is None or weight is None:
+                if imp is None or group is None or kids is None or wealth is None or weight is None:
+                    continue
+                if kids <= 0:
                     continue
                 if int(group) == 4:
                     key = "college"
@@ -134,8 +137,8 @@ def make_svg(results):
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
              '<rect width="100%" height="100%" fill="#FFFFFF"/>',
              svg_text(60, 40, "Median family net worth · thousands of 2025 dollars", 16, black, "bold")]
-    for x, label, color, dash, marker in ((112, "Bachelor’s degree or higher", black, "", "circle"),
-                                          (435, "High school or less", gray, "8 5", "square")):
+    for x, label, color, dash, marker in ((112, "BA or more (reference person)", black, "", "circle"),
+                                          (435, "High school or less (reference person)", gray, "8 5", "square")):
         dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
         parts.append(f'<line x1="{x}" y1="76" x2="{x+28}" y2="76" stroke="{color}" stroke-width="2.8"{dash_attr}/>')
         if marker == "circle":
@@ -183,10 +186,10 @@ def make_svg(results):
                   svg_text(x,bot_y1+22,row["year"],11,"#333333",anchor="middle")]
     parts += [svg_text(lx-8,y_ratio(latest["ratio"])-12,f'{latest["ratio"]:.1f}×',13,black,"bold","end"),
               '<line x1="60" y1="720" x2="1060" y2="720" stroke="#111111" stroke-width="1"/>',
-              svg_text(60,748,"Figure 1. Median family net worth by reference-person education and college-to-high-school-or-less ratio, 1989–2025.",13,black,"bold"),
+              svg_text(60,748,"Figure 1. Median net worth of families with children by reference-person education, 1989–2025.",13,black,"bold"),
               svg_text(60,776,"Source: Federal Reserve Board, Survey of Consumer Finances (SCF), public summary extracts, 1989–2025.",12,"#222222"),
-              svg_text(60,800,"Note: All families; weighted medians averaged across five implicates. Whiskers show 95% intervals. Education is of the reference person; some college excluded.",11,"#333333"),
-              svg_text(60,818,"Dollars in 2025 dollars.",11,"#333333"),
+              svg_text(60,800,"Note: Families with children (KIDS > 0); weighted medians averaged across five implicates. Whiskers show approximate 95% intervals.",11,"#333333"),
+              svg_text(60,818,"BA or more (EDCL=4) versus high school or less (EDCL=1 or 2); EDCL=3 excluded. Dollars are 2025 dollars.",11,"#333333"),
               '</svg>']
     return "\n".join(parts)
 
@@ -213,7 +216,7 @@ def main():
                     row[f"{key}_ci_lower"] = float(se_row[f"{key}_ci_lower"])
                     row[f"{key}_ci_upper"] = float(se_row[f"{key}_ci_upper"])
     with RESULTS.open("w", newline="", encoding="utf-8") as stream:
-        columns = ["year", "college_median_2025_usd",
+        columns = ["year", "population_filter", "college_median_2025_usd",
                    "high_school_or_less_median_2025_usd",
                    "median_gap_2025_usd", "median_ratio"]
         writer = csv.DictWriter(stream, fieldnames=columns)
@@ -221,6 +224,7 @@ def main():
         for row in results:
             writer.writerow({
                 "year": row["year"],
+                "population_filter": "KIDS > 0",
                 "college_median_2025_usd": row["college"],
                 "high_school_or_less_median_2025_usd": row["high_school_or_less"],
                 "median_gap_2025_usd": row["gap"],
