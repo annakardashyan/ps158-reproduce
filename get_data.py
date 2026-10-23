@@ -1,118 +1,95 @@
 #!/usr/bin/env python3
-"""Download Federal Reserve public SCF microdata for each cross-sectional wave.
+"""Download and extract Federal Reserve SCF public summary CSVs.
 
-Files are saved as downloaded from the Board's year-specific SCF pages under
-data/raw/. The script uses only Python's standard library.
+The summary extract is available for every triennial SCF wave from 1989
+through 2025. The Fed's summary extract dollar values are already adjusted
+to 2025 dollars. Files are saved under data/raw/ as both the downloaded ZIP
+and the extracted CSV.
 """
 
 from html.parser import HTMLParser
 from pathlib import Path
-import ssl
 from urllib.request import Request, urlopen
+from zipfile import ZipFile
+import io
 
 
 BASE = "https://www.federalreserve.gov"
-YEARS = list(range(1989, 2026, 3))
+YEARS = range(1989, 2026, 3)
 OUT_DIR = Path(__file__).resolve().parent / "data" / "raw"
-SSL_CONTEXT = ssl.create_default_context(cafile="/etc/ssl/cert.pem")
 
 
 class Links(HTMLParser):
+    """Collect anchor text and href pairs from a Fed survey page."""
+
     def __init__(self):
         super().__init__()
-        self.href = None
+        self._href = None
+        self._text = []
         self.items = []
 
     def handle_starttag(self, tag, attrs):
         if tag == "a":
-            self.href = dict(attrs).get("href")
+            self._href = dict(attrs).get("href")
+            self._text = []
 
     def handle_data(self, data):
-        if self.href and data.strip():
-            self.items.append((data.strip(), self.href))
+        if self._href:
+            self._text.append(data)
 
     def handle_endtag(self, tag):
-        if tag == "a":
-            self.href = None
+        if tag == "a" and self._href:
+            label = " ".join(" ".join(self._text).split())
+            self.items.append((label, self._href))
+            self._href = None
+            self._text = []
 
 
 def fetch(url):
-    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (SCF research downloader)"})
-    with urlopen(req, timeout=60, context=SSL_CONTEXT) as response:
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 (SCF research downloader)"})
+    with urlopen(request, timeout=60) as response:
         return response.read()
 
 
-def get_stata_urls(year):
-    page = (f"{BASE}/econres/scfindex.htm" if year == 2025
-            else f"{BASE}/econres/scf_{year}.htm")
-    parser = Links()
-    parser.feed(fetch(page).decode("utf-8", errors="replace"))
-    main = []
-    replicate = []
-    for label, href in parser.items:
-        text = label.lower()
-        path = href.lower()
-        if "stata" in text:
-            if "replicate" in text or "rw" in path:
-                replicate.append(href)
-            elif "main survey" in text or "stata version" in text:
-                main.append(href)
-    if not main:
-        raise RuntimeError(f"Could not locate the full public Stata data link on {page}")
-    if not replicate:
-        raise RuntimeError(f"Could not locate the Stata replicate-weight link on {page}")
-
-    def absolute(href):
-        return href if href.startswith("http") else BASE + href
-
-    return absolute(main[0]), absolute(replicate[0])
-
-
-def get_summary_stata_url(year):
+def summary_csv_url(year):
     page = (f"{BASE}/econres/scfindex.htm" if year == 2025
             else f"{BASE}/econres/scf_{year}.htm")
     parser = Links()
     parser.feed(fetch(page).decode("utf-8", errors="replace"))
     for label, href in parser.items:
-        text = label.lower()
-        if "stata" in text and "extract data" in text:
+        if "csv extract data" in label.lower():
             return href if href.startswith("http") else BASE + href
-    raise RuntimeError(f"Could not locate the Stata summary-extract link on {page}")
+    raise RuntimeError(f"Could not find the CSV summary-extract link on {page}")
 
 
-def get_summary_csv_url(year):
-    page = (f"{BASE}/econres/scfindex.htm" if year == 2025
-            else f"{BASE}/econres/scf_{year}.htm")
-    parser = Links()
-    parser.feed(fetch(page).decode("utf-8", errors="replace"))
-    for label, href in parser.items:
-        text = label.lower()
-        if "csv extract data" in text:
-            return href if href.startswith("http") else BASE + href
-    raise RuntimeError(f"Could not locate the CSV summary-extract link on {page}")
+def download_and_extract(year):
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    zip_path = OUT_DIR / f"scf_{year}_summary_extract_csv.zip"
+    csv_path = OUT_DIR / f"scf_{year}_summary_extract.csv"
 
+    if not zip_path.exists() or zip_path.stat().st_size == 0:
+        url = summary_csv_url(year)
+        payload = fetch(url)
+        if not payload.startswith(b"PK\x03\x04"):
+            raise RuntimeError(f"Expected a ZIP from {url}; received {len(payload)} bytes")
+        zip_path.write_bytes(payload)
+        print(f"Downloaded {zip_path.name} ({len(payload):,} bytes)")
+    else:
+        print(f"Already downloaded: {zip_path.name}")
 
-def download_zip(url, path):
-    if path.exists() and path.stat().st_size:
-        print(f"Already present: {path}")
-        return
-    payload = fetch(url)
-    if not payload.startswith(b"PK\x03\x04"):
-        raise RuntimeError(f"Expected a ZIP file from {url}; received {len(payload)} bytes")
-    path.write_bytes(payload)
-    print(f"Downloaded {path.name} ({len(payload):,} bytes)")
+    with ZipFile(zip_path) as archive:
+        csv_names = [name for name in archive.namelist()
+                     if name.lower().endswith(".csv")]
+        if len(csv_names) != 1:
+            raise RuntimeError(f"Expected one CSV in {zip_path.name}; found {csv_names}")
+        csv_path.write_bytes(archive.read(csv_names[0]))
+    print(f"Extracted {csv_path.name}")
 
 
 def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
     for year in YEARS:
-        main_url, replicate_url = get_stata_urls(year)
-        download_zip(main_url, OUT_DIR / f"scf_{year}_stata.zip")
-        download_zip(replicate_url, OUT_DIR / f"scf_{year}_replicate_weights_stata.zip")
-        summary_url = get_summary_stata_url(year)
-        download_zip(summary_url, OUT_DIR / f"scf_{year}_summary_extract_stata.zip")
-        csv_url = get_summary_csv_url(year)
-        download_zip(csv_url, OUT_DIR / f"scf_{year}_summary_extract_csv.zip")
+        print(f"Processing {year}...", flush=True)
+        download_and_extract(year)
 
 
 if __name__ == "__main__":
