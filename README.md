@@ -20,6 +20,8 @@ python3 estimate_uncertainty.py
 python3 plot.py
 ```
 
+The uncertainty script requires NumPy and pandas. If they are not installed in your Python environment, install them first with `python3 -m pip install numpy pandas`.
+
 `get_data.py` downloads the SCF summary-extract ZIPs and extracts the CSVs. `estimate_uncertainty.py` computes confidence intervals using the SCF replicate-weight files and requires NumPy and pandas. `plot.py` reads the downloaded data and writes `figures/wealth_gap_by_education.svg` and the processed estimates in `data/processed/`.
 
 No estimates are typed into the plotting script. The survey years and dollar values come from the downloaded SCF data.
@@ -37,6 +39,16 @@ No estimates are typed into the plotting script. The survey years and dollar val
 For 2025, the median net worth is **$628,430** (approximate 95% interval: **$537,966–$718,894**) for families whose reference person has a BA or more, and **$71,968** (**$50,060–$93,876**) for families whose reference person has a high-school education or less. The ratio of the medians is **8.73×** (approximate 95% interval: **5.97×–11.49×**).
 
 The Fed does not publish median net worth for this exact population of families with children split into these combined education groups. Published SCF figures for all families by reference-person education are not directly comparable and are not validation targets for Figure 1. The education measure describes the reference person, rather than both parents. The Fed also notes a public-data limitation in identifying foster children from 1995 onward, so `KIDS` may undercount them in those waves.
+
+## Validation checks
+
+- `get_data.py` completed for all 13 waves, 1989–2025, using the Federal Reserve ZIP files already present in `data/raw/`. It re-extracted the CSVs and checked for `KIDS`, `EDCL`, `WGT`, and `NETWORTH`. This rerun reused cached ZIPs; it did not test a fresh network download.
+- `estimate_uncertainty.py` completed for all 13 waves using the SCF replicate-weight ZIPs. The script uses `WGT` for each implicate's weighted medians, the 999 replicate weights multiplied by their replicate multiplicities for sampling variability, and variation across the five implicates for imputation variability. This follows the Fed's [guidance on estimates across five implicates](https://www.federalreserve.gov/econres/scf_faqs.htm) and [documentation for replicate weights](https://www.federalreserve.gov/econres/scf-documentation.htm).
+- I independently recomputed both five-implicate weighted medians from each wave's raw summary-extract ZIP, applying `KIDS > 0` and the two `EDCL` groups. The results matched all 13 rows in `education_wealth_gap.csv`.
+- The 2025 estimates and intervals in this README match the processed CSVs to the displayed precision. Across all waves, the saved interval centers match the corresponding point estimates. The figure labels match the population, education groups, survey years, and 2025-dollar units; its upper-axis ticks extend through $800,000 to cover the plotted intervals.
+- `python3 -m py_compile get_data.py plot.py estimate_uncertainty.py` passed. No separate test suite was present in the repository.
+
+No manual check of three values against an original published Fed table was completed. The Fed does not publish a directly comparable table for families with children in these combined education groups, so an all-family table would not validate this figure. The public SCF files used here are the Fed's files; the fresh download path was not exercised in this validation run.
 
 ## Files
 

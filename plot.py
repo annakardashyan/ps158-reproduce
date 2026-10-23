@@ -146,7 +146,7 @@ def make_svg(results):
         else:
             parts.append(f'<rect x="{x+10.5}" y="72.5" width="7" height="7" fill="white" stroke="{color}" stroke-width="2"/>')
         parts.append(svg_text(x+36, 81, label, 13, "#222222"))
-    for tick in range(0, 601, 100):
+    for tick in range(0, int(med_max / 1000) + 1, 100):
         y = y_money(tick * 1000)
         parts += [f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" stroke="#D8D8D8"/>',
                   svg_text(x0-14, y+5, f"${tick:,}k", 12, "#333333", anchor="end")]

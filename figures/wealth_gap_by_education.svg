@@ -21,6 +21,10 @@
 <text x="86" y="236.25" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333" font-weight="normal" text-anchor="end">$500k</text>
 <line x1="100" y1="197.5" x2="1060" y2="197.5" stroke="#D8D8D8"/>
 <text x="86" y="202.5" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333" font-weight="normal" text-anchor="end">$600k</text>
+<line x1="100" y1="163.8" x2="1060" y2="163.8" stroke="#D8D8D8"/>
+<text x="86" y="168.75" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333" font-weight="normal" text-anchor="end">$700k</text>
+<line x1="100" y1="130.0" x2="1060" y2="130.0" stroke="#D8D8D8"/>
+<text x="86" y="135.0" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333" font-weight="normal" text-anchor="end">$800k</text>
 <line x1="100.0" y1="130" x2="100.0" y2="400" stroke="#EEEEEE"/>
 <text x="100.0" y="422" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#333333" font-weight="normal" text-anchor="middle">1989</text>
 <line x1="180.0" y1="130" x2="180.0" y2="400" stroke="#EEEEEE"/>
